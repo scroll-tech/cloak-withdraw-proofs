@@ -91,6 +91,14 @@ export class WithdrawTrie {
     this.branches.fill(ZeroHash);
   }
 
+  public clone(): WithdrawTrie {
+    const wt = new WithdrawTrie();
+    wt.nextMessageNonce = this.nextMessageNonce;
+    wt.height = this.height;
+    wt.branches = [...this.branches];
+    return wt;
+  }
+
   public initialize(nextMessageNonce: number, height: number, branches: Array<string>): void {
     while (branches.length < MaxHeight) {
       branches.push(ZeroHash);

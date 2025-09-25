@@ -88,7 +88,7 @@ export async function indexBatches() {
   logger.info(`Resuming from last processed batch: ${latestProcessedBatchIndex}`);
 
   // Initialize the in-memory withdraw trie.
-  const withdrawTrie = new WithdrawTrie();
+  let withdrawTrie = new WithdrawTrie();
   const lastWithdrawal = await withdrawals.latest();
 
   if (lastWithdrawal) {
@@ -115,15 +115,22 @@ export async function indexBatches() {
     const toBatchIndex = Math.min(latest, fromBatchIndex + batchSize - 1);
     const bs = await batches.get(fromBatchIndex, toBatchIndex);
 
+    // Work on a clone of the withdraw trie, so that we
+    // do not compromise it if the DB transaction fails.
+    const wt = withdrawTrie.clone();
+
     try {
       await db.transaction(async (dbTx: Knex.Transaction) => {
-        for (const batch of bs) await processBatch(dbTx, batch, withdrawTrie);
+        for (const batch of bs) await processBatch(dbTx, batch, wt);
         await indexer_state.set(dbTx, 'batches', toBatchIndex);
         latestProcessedBatchIndex = toBatchIndex;
       });
     } catch (err) {
       logger.error(`Unexpected error while processing batches: ${err}`);
       await sleep(sleepMs);
+      continue;
     }
+
+    withdrawTrie = wt;
   }
 }

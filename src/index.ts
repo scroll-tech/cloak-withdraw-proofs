@@ -1,6 +1,7 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 
+import { config } from './config';
 import logger from './logger';
 import db from './db/client';
 import rpc from './rpc';
@@ -19,8 +20,8 @@ async function main() {
   const app = express();
   app.use(bodyParser.json());
   app.post('/', rpc);
-  app.listen(3000);
-  logger.info('JSON-RPC server listening on port 3000');
+  app.listen(config.port);
+  logger.info(`JSON-RPC server listening on port ${config.port}`);
 
   await Promise.all([indexBatches()]);
 }

@@ -12,6 +12,9 @@ function getEnv(key: string): string {
 }
 
 export const config = {
+  port: Number(getEnv('PORT')),
+  logLevel: process.env.LOG_LEVEL || 'info',
+
   endpoints: {
     validium: getEnv('VALIDIUM_ENDPOINT'),
   },

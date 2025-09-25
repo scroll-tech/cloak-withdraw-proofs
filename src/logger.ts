@@ -1,10 +1,9 @@
 import winston, { format } from 'winston';
 
-import dotenv from 'dotenv';
-dotenv.config({ quiet: true });
+import { config } from './config';
 
 export default winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: config.logLevel,
   format: format.combine(
     format.splat(),
     format.colorize(),

@@ -10,7 +10,7 @@ export interface WithdrawalInsert {
   from: string;
   to: string;
   value: string;
-  nonce: string;
+  nonce: number;
   message: string;
   batch_index: number;
   proof: string;
@@ -48,13 +48,21 @@ const publicFields = [
 ];
 
 export async function findByTxHash(txHash: string): Promise<Withdrawal[]> {
-  return db<Withdrawal>(TABLE_NAME)
-    .select(...publicFields)
-    .whereRaw('LOWER(validium_tx_hash) = LOWER(?)', [txHash]);
+  return (
+    db<Withdrawal>(TABLE_NAME)
+      .select(...publicFields)
+      .whereRaw('LOWER(validium_tx_hash) = LOWER(?)', [txHash])
+      // convert bigint decimal string to hex string
+      .then((ws) => ws.map((w) => ({ ...w, value: '0x' + BigInt(w.value).toString(16) })))
+  );
 }
 
 export async function findByMessageHash(messageHash: string): Promise<Withdrawal[]> {
-  return db<Withdrawal>(TABLE_NAME)
-    .select(...publicFields)
-    .whereRaw('LOWER(message_hash) = LOWER(?)', [messageHash]);
+  return (
+    db<Withdrawal>(TABLE_NAME)
+      .select(...publicFields)
+      .whereRaw('LOWER(message_hash) = LOWER(?)', [messageHash])
+      // convert bigint decimal string to hex string
+      .then((ws) => ws.map((w) => ({ ...w, value: '0x' + BigInt(w.value).toString(16) })))
+  );
 }

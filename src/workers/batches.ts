@@ -26,7 +26,7 @@ async function processBatch(
   withdrawTrie: WithdrawTrie,
 ) {
   logger.info(
-    `Processing batch ${batch.batch_index} (blocks ${batch.start_block_number} - ${batch.end_block_number}, status ${batch.rollup_status})`,
+    `Processing batch ${batch.batch_index} (blocks ${batch.start_block_number}-${batch.end_block_number})`,
   );
 
   const logs = await validiumProvider.getLogs({
@@ -35,6 +35,8 @@ async function processBatch(
     fromBlock: Number(batch.start_block_number),
     toBlock: Number(batch.end_block_number),
   });
+
+  if (logs.length === 0) return;
 
   // Note: The contracts guarantee that the logs are emitted
   // from the correct contract, and the counts match.
@@ -45,7 +47,7 @@ async function processBatch(
   );
   const proofs = withdrawTrie.appendMessages(messageHashes);
 
-  logger.debug(`Found ${appendMessageLogs.length} withdrawals in batch ${batch.batch_index}`);
+  logger.info(`Found ${appendMessageLogs.length} withdrawals in batch ${batch.batch_index}`);
 
   for (let ii = 0; ii < sentMessageLogs.length; ii++) {
     const log = sentMessageLogs[ii];
@@ -57,12 +59,14 @@ async function processBatch(
       message_hash: messageHashes[ii],
       from: parsedLog.args.getValue('sender'),
       to: parsedLog.args.getValue('target'),
-      value: parsedLog.args.getValue('value').toString(),
-      nonce: parsedLog.args.getValue('messageNonce').toString(),
+      value: parsedLog.args.getValue('value').toString(), // bigint as string decimal
+      nonce: Number(parsedLog.args.getValue('messageNonce')),
       message: parsedLog.args.getValue('message'),
       batch_index: Number(batch.batch_index),
       proof: proofs[ii],
     };
+
+    logger.debug(`New withdrawal, message hash: ${withdrawal.message_hash}`);
 
     await withdrawals.insert(dbTx, withdrawal);
   }
@@ -81,7 +85,7 @@ export async function indexBatches() {
   // Resume from the last processed batch.
   const lastPersistedBatchIndex = await indexer_state.get('batches');
   let latestProcessedBatchIndex = lastPersistedBatchIndex;
-  logger.debug(`Resuming from last processed batch: ${latestProcessedBatchIndex}`);
+  logger.info(`Resuming from last processed batch: ${latestProcessedBatchIndex}`);
 
   // Initialize the in-memory withdraw trie.
   const withdrawTrie = new WithdrawTrie();
@@ -111,10 +115,15 @@ export async function indexBatches() {
     const toBatchIndex = Math.min(latest, fromBatchIndex + batchSize - 1);
     const bs = await batches.get(fromBatchIndex, toBatchIndex);
 
-    await db.transaction(async (dbTx) => {
-      for (const batch of bs) await processBatch(dbTx, batch, withdrawTrie);
-      await indexer_state.set(dbTx, 'batches', toBatchIndex);
-      latestProcessedBatchIndex = toBatchIndex;
-    });
+    try {
+      await db.transaction(async (dbTx: Knex.Transaction) => {
+        for (const batch of bs) await processBatch(dbTx, batch, withdrawTrie);
+        await indexer_state.set(dbTx, 'batches', toBatchIndex);
+        latestProcessedBatchIndex = toBatchIndex;
+      });
+    } catch (err) {
+      logger.error(`Unexpected error while processing batches: ${err}`);
+      await sleep(sleepMs);
+    }
   }
 }

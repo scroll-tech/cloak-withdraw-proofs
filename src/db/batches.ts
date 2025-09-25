@@ -5,7 +5,6 @@ export interface Batch {
   batch_hash: string;
   start_block_number: string; // bigint
   end_block_number: string; // bigint
-  rollup_status: number;
 }
 
 enum RollupStatus {
@@ -30,7 +29,6 @@ export async function get(startIndex: number, endIndex: number): Promise<Batch[]
       'b.hash as batch_hash',
       'sc.start_block_number',
       'ec.end_block_number',
-      'b.rollup_status',
     )
     .where('b.rollup_status', RollupStatus.Finalized)
     .whereBetween('b.index', [startIndex, endIndex])

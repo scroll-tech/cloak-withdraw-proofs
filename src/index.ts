@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import bodyParser from 'body-parser';
 
 import { config } from './config';
@@ -14,15 +14,37 @@ async function runMigrations() {
   logger.info(`Batch ${batchNo} run: ${log.length} migrations`);
 }
 
-async function main() {
-  await runMigrations();
-
+async function startServer() {
   const app = express();
+
   app.use(bodyParser.json());
+  app.disable('x-powered-by');
+
+  // Register JSON-RPC endpoint
   app.post('/', rpc);
-  app.listen(config.port);
+
+  // Register health check endpoint
+  app.get('/health', (_req: Request, res: Response) => {
+    res.status(200).send('Ok');
+  });
+
+  const server = app.listen(config.port);
   logger.info(`JSON-RPC server listening on port ${config.port}`);
 
+  const close = (signal: string) => () => {
+    logger.debug(`${signal} signal received: closing HTTP server`);
+    server.close(() => {
+      logger.info('HTTP server closed');
+    });
+  };
+
+  process.on('SIGTERM', close('SIGTERM'));
+  process.on('SIGINT', close('SIGINT'));
+}
+
+async function main() {
+  await runMigrations();
+  await startServer();
   await Promise.all([indexBatches()]);
 }
 

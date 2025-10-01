@@ -25,7 +25,7 @@ async function startServer() {
 
   // Register health check endpoint
   app.get('/health', (_req: Request, res: Response) => {
-    res.status(200).send('Ok');
+    res.status(200).json({ status: 'ok' });
   });
 
   const server = app.listen(config.port);
@@ -35,6 +35,7 @@ async function startServer() {
     logger.debug(`${signal} signal received: closing HTTP server`);
     server.close(() => {
       logger.info('HTTP server closed');
+      process.exit(0);
     });
   };
 
@@ -50,4 +51,5 @@ async function main() {
 
 main().catch((err) => {
   logger.error('Error occurred in main:', err);
+  process.exit(1);
 });
